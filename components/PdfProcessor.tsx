@@ -160,7 +160,7 @@ export default function PdfProcessor() {
         const { width, height } = page.getSize()
         if (width > 800 || height > 800) {
           const scale = Math.min(800 / width, 800 / height)
-          page.scaleContent(scale)
+          page.scaleContent(scale, scale)
         }
         mergedPdf.addPage(page)
       })
