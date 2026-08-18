@@ -1,8 +1,18 @@
 'use client'
 
+import dynamic from 'next/dynamic'
 import { motion } from 'framer-motion'
-import { Upload, Shield, Lock, Zap } from 'lucide-react'
-import PdfProcessor from '@/components/PdfProcessor'
+import { Shield, Lock, Zap } from 'lucide-react'
+
+const PdfProcessor = dynamic(() => import('@/components/PdfProcessor'), {
+  ssr: false,
+  loading: () => (
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-12 flex flex-col items-center justify-center">
+      <div className="w-10 h-10 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin mb-4" />
+      <p className="text-slate-600 font-medium">Cargando herramientas PDF...</p>
+    </div>
+  ),
+})
 
 export default function Home() {
   return (
@@ -56,9 +66,25 @@ export default function Home() {
       {/* Footer */}
       <footer className="mt-24 border-t border-slate-200 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <p className="text-center text-slate-500 text-sm">
-            © 2024 DocExpress. Todos los derechos reservados.
-          </p>
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p className="text-center text-slate-500 text-sm">
+              © 2024 DocExpress. Todos los derechos reservados.
+            </p>
+            <div className="flex items-center gap-6">
+              <a
+                href="/terms"
+                className="text-slate-500 hover:text-slate-700 text-sm font-medium transition-colors"
+              >
+                Términos de Servicio
+              </a>
+              <a
+                href="/privacy"
+                className="text-slate-500 hover:text-slate-700 text-sm font-medium transition-colors"
+              >
+                Política de Privacidad
+              </a>
+            </div>
+          </div>
         </div>
       </footer>
     </div>

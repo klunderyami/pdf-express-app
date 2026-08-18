@@ -2,41 +2,66 @@
 
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Check, Zap } from 'lucide-react'
+import { X, Check, Zap, Loader2 } from 'lucide-react'
 import { PayPalButtons } from '@paypal/react-paypal-js'
 
 interface PaywallModalProps {
   isOpen: boolean
   onClose: () => void
+  onSuccess: () => void
 }
 
-export default function PaywallModal({ isOpen, onClose }: PaywallModalProps) {
+export default function PaywallModal({ isOpen, onClose, onSuccess }: PaywallModalProps) {
   const [selectedPlan, setSelectedPlan] = useState<'pass' | 'monthly'>('pass')
   const [processing, setProcessing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  const handleApprove = async (data: any) => {
-    // Simulación de aprobación de pago
-    // En producción, aquí verificarías el pago con tu backend
-    console.log('Pago aprobado:', data)
+  const handleApprove = async (data: { orderID: string }) => {
+    setProcessing(true)
+    setError(null)
 
-    // Guardar autorización en localStorage
-    const auth = {
-      expiry: Date.now() + (selectedPlan === 'pass' ? 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000),
-      plan: selectedPlan,
+    try {
+      const response = await fetch('/api/paypal/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          orderId: data.orderID,
+          planType: selectedPlan,
+          expectedAmount: selectedPlan === 'pass' ? '0.99' : '3.99',
+        }),
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Error al verificar el pago')
+      }
+
+      if (result.success) {
+        onSuccess()
+        onClose()
+      } else {
+        throw new Error(result.error || 'Error en el pago')
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al procesar el pago')
+      console.error('Payment error:', err)
+    } finally {
+      setProcessing(false)
     }
-
-    localStorage.setItem('docexpress_pro', JSON.stringify(auth))
-    setProcessing(false)
-    onClose()
   }
 
   const handleError = (err: any) => {
-    console.error('Error en el pago:', err)
+    console.error('PayPal error:', err)
+    setError('Error en el sistema de pagos. Por favor, intenta de nuevo.')
     setProcessing(false)
   }
 
   const handleCancel = () => {
     setProcessing(false)
+    setError(null)
   }
 
   return (
@@ -64,23 +89,38 @@ export default function PaywallModal({ isOpen, onClose }: PaywallModalProps) {
               </div>
               <button
                 onClick={onClose}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                disabled={processing}
+                className="p-2 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50"
               >
                 <X className="w-5 h-5 text-slate-600" />
               </button>
             </div>
+
+            {/* Error Message */}
+            <AnimatePresence>
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="mx-6 mt-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg"
+                >
+                  <p className="text-sm">{error}</p>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Plans */}
             <div className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 {/* Urgency Pass */}
                 <div
-                  onClick={() => setSelectedPlan('pass')}
+                  onClick={() => !processing && setSelectedPlan('pass')}
                   className={`border-2 rounded-xl p-6 cursor-pointer transition-all ${
                     selectedPlan === 'pass'
                       ? 'border-primary-500 bg-primary-50'
                       : 'border-slate-200 hover:border-slate-300'
-                  }`}
+                  } ${processing ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div>
@@ -111,12 +151,12 @@ export default function PaywallModal({ isOpen, onClose }: PaywallModalProps) {
 
                 {/* Monthly Plan */}
                 <div
-                  onClick={() => setSelectedPlan('monthly')}
+                  onClick={() => !processing && setSelectedPlan('monthly')}
                   className={`border-2 rounded-xl p-6 cursor-pointer transition-all ${
                     selectedPlan === 'monthly'
                       ? 'border-primary-500 bg-primary-50'
                       : 'border-slate-200 hover:border-slate-300'
-                  }`}
+                  } ${processing ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div>
@@ -154,7 +194,13 @@ export default function PaywallModal({ isOpen, onClose }: PaywallModalProps) {
 
               {/* PayPal Buttons */}
               <div className="border-t border-slate-200 pt-6">
-                <PayPalButtons
+                {processing ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-8 h-8 animate-spin text-primary-600 mr-3" />
+                    <span className="text-slate-700 font-medium">Verificando pago...</span>
+                  </div>
+                ) : (
+                  <PayPalButtons
                     style={{
                       layout: 'vertical',
                       color: 'blue',
@@ -185,6 +231,7 @@ export default function PaywallModal({ isOpen, onClose }: PaywallModalProps) {
                     onError={handleError}
                     onCancel={handleCancel}
                   />
+                )}
               </div>
 
               {/* Security Note */}
